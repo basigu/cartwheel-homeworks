@@ -30,6 +30,35 @@ MAX_SEARCH_LIMIT = 25
 DEFAULT_ORDER_LIMIT = 20
 
 
+def get_store_info(ctx: AuthContext, store: str) -> dict[str, Any]:
+    """Look up public store information by case-insensitive name or slug.
+
+    Every role may read store information. Returns the store's identifier,
+    name, slug, catalog category, return-window override, and restocking-fee
+    opt-in. A null return-window override means the platform policy applies;
+    fetch the policy separately for its terms. Returns not_found for an
+    unknown store and invalid_argument for a blank name.
+    """
+    store = store.strip()
+    if not store:
+        return {"ok": False, "error": "invalid_argument", "reason": "empty store name"}
+    with db.connection() as conn:
+        matched = db.get_store_by_name(conn, store)
+    if matched is None:
+        return {"ok": False, "error": "not_found", "reason": f"no store '{store}'"}
+    return {
+        "ok": True,
+        "store": {
+            "store_id": matched.id,
+            "name": matched.name,
+            "slug": matched.slug,
+            "category": matched.category,
+            "return_window_days_override": matched.return_window_days_override,
+            "restocking_fee_opt_in": matched.restocking_fee_opt_in,
+        },
+    }
+
+
 def get_policy(ctx: AuthContext, policy_id: str) -> dict[str, Any]:
     """Fetch one policy doc by its exact id. Risk tier: read.
 

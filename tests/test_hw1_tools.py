@@ -13,6 +13,40 @@ SUPPORT = AuthContext(user_id=9501, role="support")
 
 
 @pytest.mark.parametrize("ctx", [SHOPPER, MERCHANT, SUPPORT])
+@pytest.mark.parametrize("store", ["Juniper Home Goods", "JUNIPER-HOME-GOODS"])
+def test_hw1_public_store_lookup(world, ctx, store):
+    with db.connection() as conn:
+        expected = db.get_store_by_name(conn, store)
+    assert tools.get_store_info(ctx, store) == {
+        "ok": True,
+        "store": {
+            "store_id": expected.id,
+            "name": expected.name,
+            "slug": expected.slug,
+            "category": expected.category,
+            "return_window_days_override": expected.return_window_days_override,
+            "restocking_fee_opt_in": expected.restocking_fee_opt_in,
+        },
+    }
+
+
+def test_hw1_public_store_lookup_errors_and_default_policy(world):
+    assert tools.get_store_info(SHOPPER, " \t ")["error"] == "invalid_argument"
+    missing = tools.get_store_info(SHOPPER, "No Such Store")
+    assert missing["error"] == "not_found"
+    assert "No Such Store" in missing["reason"]
+    result = tools.get_store_info(SHOPPER, "Blue Heron Ceramics")
+    assert result["store"]["return_window_days_override"] is None
+
+
+@pytest.mark.parametrize("ctx", [SHOPPER, MERCHANT, SUPPORT])
+def test_hw1_public_store_lookup_is_registered(ctx):
+    from agent.agent import TOOLS_BY_ROLE
+
+    assert "get_store_info" in [tool.name for tool in TOOLS_BY_ROLE[ctx.role]]
+
+
+@pytest.mark.parametrize("ctx", [SHOPPER, MERCHANT, SUPPORT])
 def test_hw1_policy_is_public_and_exact(world, ctx):
     result = tools.get_policy(ctx, "cw-returns")
     assert set(result) == {"ok", "policy_id", "title", "audience", "body"}
